@@ -1,0 +1,107 @@
+// 이진 탐색 트리에서 key에 해당하는 값을 조회하는 함수
+RedisModuleString* BST_Get(BinarySearchTree *bst, long long key) {
+    TreeNode *node = BST_Search(bst, key);
+    if (node != NULL) {
+        return node->value;
+    } else {
+        return NULL;
+    }
+}
+
+// 이진 탐색 트리에 key-value 쌍을 삽입하는 함수
+void BST_Set(BinarySearchTree *bst, long long key, RedisModuleString *value) {
+    BST_Insert(bst, key, value);
+}
+
+// BSGET 명령어 처리 함수
+int BSGET_Command(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
+    REDISMODULE_NOT_USED(argc);
+
+    if (argc != 2) {
+        RedisModule_WrongArity(ctx);
+        return REDISMODULE_ERR;
+    }
+
+    RedisModule_AutoMemory(ctx);
+
+    BinarySearchTree *bst = (BinarySearchTree *)RedisModule_ModuleTypeGetValue(ctx, BST_DATA_TYPE);
+    if (bst == NULL) {
+        RedisModule_ReplyWithError(ctx, "BST datatype not found");
+        return REDISMODULE_ERR;
+    }
+
+    long long key;
+    if (RedisModule_StringToLongLong(argv[1], &key) != REDISMODULE_OK) {
+        RedisModule_ReplyWithError(ctx, "Invalid key");
+        return REDISMODULE_ERR;
+    }
+
+    RedisModuleString *value = BST_Get(bst, key);
+    if (value != NULL) {
+        RedisModule_ReplyWithString(ctx, value);
+    } else {
+        RedisModule_ReplyWithNull(ctx);
+    }
+
+    return REDISMODULE_OK;
+}
+
+// BSSET 명령어 처리 함수
+int BSSET_Command(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
+    REDISMODULE_NOT_USED(argc);
+
+    if (argc != 3) {
+        RedisModule_WrongArity(ctx);
+        return REDISMODULE_ERR;
+    }
+
+    RedisModule_AutoMemory(ctx);
+
+    BinarySearchTree *bst = (BinarySearchTree *)RedisModule_ModuleTypeGetValue(ctx, BST_DATA_TYPE);
+    if (bst == NULL) {
+        RedisModule_ReplyWithError(ctx, "BST datatype not found");
+        return REDISMODULE_ERR;
+    }
+
+    long long key;
+    if (RedisModule_StringToLongLong(argv[1], &key) != REDISMODULE_OK) {
+        RedisModule_ReplyWithError(ctx, "Invalid key");
+        return REDISMODULE_ERR;
+    }
+
+    RedisModuleString *value = RedisModule_CreateStringFromString(ctx, argv[2]);
+    if (value == NULL) {
+        RedisModule_ReplyWithError(ctx, "Failed to create value string");
+        return REDISMODULE_ERR;
+    }
+
+    BST_Set(bst, key, value);
+
+    RedisModule_ReplyWithSimpleString(ctx, "OK");
+    return REDISMODULE_OK;
+}
+
+int RedisModule_OnLoad(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
+    REDISMODULE_NOT_USED(argv);
+    REDISMODULE_NOT_USED(argc);
+
+    if (RedisModule_Init(ctx, "datatype", DATATYPE_ENC_VER, REDISMODULE_APIVER_1) == REDISMODULE_ERR)
+        return REDISMODULE_ERR;
+
+    // 추가 명령어 등록
+    if (RedisModule_CreateCommand(ctx, "datatype.add_binary_search_tree", AddBinarySearchTreeToDataTypeCommand,
+                                  "write deny-oom", 0, 0, 0) == REDISMODULE_ERR)
+        return REDISMODULE_ERR;
+
+    // BSGET 명령어 등록
+    if (RedisModule_CreateCommand(ctx, "BSGET", BSGET_Command, "readonly", 1, 1, 1) == REDISMODULE_ERR)
+        return REDISMODULE_ERR;
+
+    // BSSET 명령어 등록
+    if (RedisModule_CreateCommand(ctx, "BSSET", BSSET_Command, "write deny-oom", 1, 1, 1) == REDISMODULE_ERR)
+        return REDISMODULE_ERR;
+
+    // 기존의 datatype 관련 명령어 등록
+    // ...
+
+    return REDISMODULE_OK;
